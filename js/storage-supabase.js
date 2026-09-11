@@ -66,14 +66,30 @@ export async function loadAll() {
   const { data: { user: authUser } } = await supabase.auth.getUser();
   state.user = authUser ? (state.users.find(u => u.id === authUser.id) || null) : null;
 
-  // 4. Config jeux (local)
-  const cfgRaw = localStorage.getItem('endurance_game_configs');
-  if (cfgRaw) {
-    try {
-      const cfg = JSON.parse(cfgRaw);
-      state.gameConfigs = cfg.configs || {};
-      state.gameIds = cfg.ids || [];
-    } catch (e) {}
+  // 4. Configs jeux depuis Supabase
+  const { data: gameConfigs, error: errG } = await supabase
+    .from('game_configs')
+    .select('game_id, data');
+
+  if (errG) console.error('Erreur chargement game_configs:', errG);
+
+  if (gameConfigs && gameConfigs.length > 0) {
+    state.gameConfigs = {};
+    state.gameIds = [];
+    gameConfigs.forEach(row => {
+      state.gameConfigs[row.game_id] = row.data;
+      state.gameIds.push(row.game_id);
+    });
+  } else {
+    // Fallback : localStorage (mode hors-ligne)
+    const cfgRaw = localStorage.getItem('endurance_game_configs');
+    if (cfgRaw) {
+      try {
+        const cfg = JSON.parse(cfgRaw);
+        state.gameConfigs = cfg.configs || {};
+        state.gameIds = cfg.ids || [];
+      } catch (e) {}
+    }
   }
 
   return { ...state };
@@ -90,7 +106,6 @@ export async function loginDiscord() {
     }
   });
   if (error) throw error;
-  // La page va se recharger via la redirection
 }
 
 export async function logout() {
@@ -126,7 +141,6 @@ export async function getCurrentUser() {
 // COURSES
 // ============================================================
 export async function saveEvent(event) {
-  // Détecter si c'est une création (id temporaire) ou un update
   const isNew = !event.id || event.id.startsWith('id-') || event.id.length < 20;
 
   const row = {
@@ -140,7 +154,6 @@ export async function saveEvent(event) {
     setups: event.setups || {}
   };
 
-  // Récupérer l'user connecté pour created_by
   const { data: { user: authUser } } = await supabase.auth.getUser();
   if (authUser) row.created_by = authUser.id;
 
@@ -164,7 +177,6 @@ export async function saveEvent(event) {
     result = data;
   }
 
-  // Remapper vers format app
   const saved = {
     id: result.id,
     name: result.name,
@@ -178,7 +190,6 @@ export async function saveEvent(event) {
     createdBy: result.created_by
   };
 
-  // Update state local
   const idx = state.events.findIndex(e => e.id === saved.id);
   if (idx > -1) state.events[idx] = saved;
   else state.events.push(saved);
@@ -225,7 +236,7 @@ export async function deleteUser(userId) {
 }
 
 // ============================================================
-// CONFIG JEUX (local pour l'instant)
+// CONFIG JEUX (localStorage uniquement en cache)
 // ============================================================
 export async function saveGameConfigs(gameConfigs, gameIds) {
   state.gameConfigs = gameConfigs;
@@ -245,9 +256,17 @@ export function subscribe(callback) {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'courses' },
-      async (payload) => {
+      async () => {
         await loadAll();
-        callback(payload);
+        callback();
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'game_configs' },
+      async () => {
+        await loadAll();
+        callback();
       }
     )
     .subscribe();

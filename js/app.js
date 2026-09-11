@@ -25,7 +25,9 @@ export const state = {
   searchQuery: '',
   openDepartures: {},
   crewForm: null,
-  drafts: {}
+  drafts: {},
+  adminSelectedGame: null,
+  userSearch: ''
 };
 
 window.actions = actions;
@@ -140,6 +142,13 @@ export function getCircuitsForGame(gameId) {
   return getGameConfig(gameId)?.circuits || [];
 }
 
+export function getCircuitName(gameId, circuitId) {
+  if (!circuitId) return 'Circuit';
+  const circuits = getCircuitsForGame(gameId);
+  const found = circuits.find(c => c.id === circuitId);
+  return found?.name || circuitId;
+}
+
 export function getCategoriesForGame(gameId) {
   return getGameConfig(gameId)?.categories || [];
 }
@@ -183,6 +192,16 @@ export function renderNav() {
 
   if (canManage()) {
     html += `<button class="btn btn-primary btn-sm" data-action="create">➕ Nouvelle course</button>`;
+  }
+
+  if (isAdmin()) {
+    html += `<button class="btn btn-outline btn-sm" data-action="adminPanel">⚙️ Admin</button>`;
+    html += `<button class="btn btn-outline btn-sm" data-action="adminUsers">👥 Comptes</button>`;
+    html += `<button class="btn btn-outline btn-sm" data-action="adminCleanup" title="Supprimer les événements passés">🧹 Clean</button>`;
+  }
+
+  if (state.user) {
+    html += `<button class="btn btn-outline btn-sm" data-action="myEntries">📋 Mes inscriptions</button>`;
   }
 
   if (state.user) {
@@ -439,7 +458,7 @@ function renderDepartureTile(dep, now) {
         <span class="departure-number">Départ #${(dep.event.departures || []).findIndex(d => d.id === dep.id) + 1}</span>
       </div>
       <div class="meta">
-        <span>📍 ${escapeHtml(dep.eventCircuit || 'Circuit')}</span>
+        <span>📍 ${escapeHtml(getCircuitName(dep.gameId, dep.eventCircuit))}</span>
         <span>⏱ ${dep.eventDuration}h</span>
         <span>👥 ${totalPilots} pilote${totalPilots > 1 ? 's' : ''}</span>
         <span>🏎 ${totalCrews} équipage${totalCrews > 1 ? 's' : ''}</span>
@@ -543,13 +562,24 @@ async function init() {
     showLoader(false);
     renderHome();
 
+    // ✅ Auto-suppression des événements passés
+    try {
+      await actions.autoDeletePastEvents();
+    } catch (err) {
+      console.error('Erreur autoDeletePastEvents:', err);
+    }
+
     storage.subscribe(() => {
       storage.loadAll().then(d => {
         state.events = d.events;
         state.users = d.users;
         state.user = d.user;
+        state.gameConfigs = Object.keys(d.gameConfigs || {}).length ? d.gameConfigs : state.gameConfigs;
+        state.gameIds = (d.gameIds && d.gameIds.length) ? d.gameIds : state.gameIds;
+
         if (state.page === 'home') renderHome();
         else if (state.page === 'event') re.renderEventDetail();
+        else if (state.page === 'admin') import('./render-admin.js').then(m => m.renderAdmin());
         showToast('🔄 Données mises à jour', 'info');
       });
     });

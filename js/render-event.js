@@ -77,9 +77,7 @@ export function renderEventDetail() {
 }
 
 function getCircuitName(event) {
-  const circuits = app.getCircuitsForGame(event.gameId);
-  const found = circuits.find(c => c.id === event.circuit);
-  return found?.name || event.circuit || 'Circuit';
+  return app.getCircuitName(event.gameId, event.circuit);
 }
 
 // ============================================================
