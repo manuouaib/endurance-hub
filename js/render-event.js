@@ -45,7 +45,7 @@ export function renderEventDetail() {
             <span class="badge ${gameBadge}" style="font-size:0.75rem;">${config ? config.icon + ' ' + config.name : '🎮 Inconnu'}</span>
             <span class="badge badge-${event.eventType === 'private' ? 'private' : 'special'}" style="font-size:0.75rem;">${escapeHtml(event.eventType || 'Privé')}</span>
             · ${event.duration}h · ${(event.departures || []).length} départ${(event.departures || []).length > 1 ? 's' : ''}
-            · ${escapeHtml(getCircuitName(event))}
+            · ${escapeHtml(app.getCircuitName(event.gameId, event.circuit))}
           </div>
         </div>
       </div>
@@ -74,10 +74,6 @@ export function renderEventDetail() {
   main.innerHTML = html;
   app.renderNav();
   startCountdowns();
-}
-
-function getCircuitName(event) {
-  return app.getCircuitName(event.gameId, event.circuit);
 }
 
 // ============================================================
@@ -124,7 +120,6 @@ function renderRegistrationForm(event, departure) {
     return `<p class="text-dim" style="margin-bottom:14px;">Connecte-toi pour t'inscrire.</p>`;
   }
 
-  // Récupérer ou créer un draft
   const draft = getDraftFor(departure);
   const duration = event.duration || 6;
   const startTs = departure.startsAt;
@@ -209,7 +204,7 @@ function renderRegistrationForm(event, departure) {
 }
 
 // ============================================================
-// GESTION ÉQUIPAGES (organisateur)
+// GESTION ÉQUIPAGES
 // ============================================================
 function renderCrewManagement(event, departure) {
   const crews = departure.crews || [];
@@ -240,6 +235,7 @@ function renderCrewManagement(event, departure) {
                 ${escapeHtml(crew.name)}
                 <span class="crew-index">#${idx + 1}</span>
                 <span class="badge badge-${app.badgeClass(crew.category)}" style="font-size:0.5rem;">${escapeHtml(crew.category)}</span>
+                ${crew.locked ? '<span style="color:var(--accent-gold);font-size:0.8rem;">🔒 Verrouillé</span>' : ''}
               </div>
               <div class="crew-meta">
                 ${crew.car ? `🚗 ${escapeHtml(crew.car)}` : '🚗 Voiture à définir'}
@@ -255,8 +251,15 @@ function renderCrewManagement(event, departure) {
                 ${pilots.length === 0 ? '<span class="text-dim" style="font-size:0.8rem;">Aucun pilote</span>' : ''}
               </div>
               <div class="crew-actions">
-                <button type="button" class="btn btn-outline btn-sm" data-action="editCrew" data-dep="${departure.id}" data-crew="${crew.id}">✏️</button>
-                <button type="button" class="btn btn-danger btn-sm" data-action="deleteCrew" data-dep="${departure.id}" data-crew="${crew.id}">🗑</button>
+                <button type="button" class="btn btn-outline btn-sm" data-action="editCrew" data-dep="${departure.id}" data-crew="${crew.id}" title="Modifier">✏️</button>
+                <button type="button" class="btn ${crew.locked ? 'btn-success' : 'btn-outline'} btn-sm"
+                        data-action="toggleCrewLock"
+                        data-dep="${departure.id}"
+                        data-crew="${crew.id}"
+                        title="${crew.locked ? 'Déverrouiller' : 'Verrouiller'}">
+                  ${crew.locked ? '🔒' : '🔓'}
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" data-action="deleteCrew" data-dep="${departure.id}" data-crew="${crew.id}" title="Supprimer">🗑</button>
               </div>
             </div>
           `;
@@ -305,15 +308,16 @@ function renderCrewForm(event, departure) {
 
       ${cf.category ? `
         <div class="form-group">
-          <label>Pilotes disponibles (${availablePilots.length})</label>
-          <div class="pilot-select-grid">
+          <label>Pilotes disponibles (${availablePilots.length}) — ${cf.selectedPilots.length} sélectionné${cf.selectedPilots.length > 1 ? 's' : ''}</label>
+          <div class="pilot-select-grid" id="pilotSelectGrid">
             ${availablePilots.map(p => {
-              const isSelected = cf.selectedPilots?.includes(p.id);
+              const isSelected = cf.selectedPilots.includes(p.id);
               return `
-                <label class="pilot-option ${isSelected ? 'selected' : ''}">
-                  <input type="checkbox" ${isSelected ? 'checked' : ''} data-action="toggleCrewPilot" data-pilot="${p.id}">
+                <div class="pilot-option ${isSelected ? 'selected' : ''}"
+                     onclick="window.actions.toggleCrewPilotClick(event, '${p.id}')">
+                  <input type="checkbox" ${isSelected ? 'checked' : ''} tabindex="-1">
                   <span class="pilot-check-label">${escapeHtml(p.name)} ${p.userId === app.state.user?.id ? '⭐' : ''}</span>
-                </label>
+                </div>
               `;
             }).join('')}
             ${availablePilots.length === 0 ? '<span class="text-dim" style="font-size:0.75rem;">Aucun pilote disponible dans cette catégorie</span>' : ''}
@@ -462,7 +466,8 @@ export function autoAssignCrews(departure, event) {
         name: `${category} #${crews.length + 1}`,
         category,
         car: '',
-        registrationIds: chunk.map(p => p.id)
+        registrationIds: chunk.map(p => p.id),
+        locked: false
       });
     }
   });

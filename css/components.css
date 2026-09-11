@@ -1378,3 +1378,127 @@
     flex: 1;
   }
 }
+/* ===== TILE CREWS ===== */
+.tile-crews {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.tile-crews-header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+.tile-crews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tile-crew-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.tile-crew-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.tile-crew-name {
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex: 1;
+}
+.tile-crew-lock {
+  font-size: 0.85rem;
+}
+.tile-crew-pilots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.tile-crew-pilot {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+.tile-crew-car {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+/* ===== TILE CREWS ===== */
+.tile-crews {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.tile-crews-header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+.tile-crews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tile-crew-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-gold);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.tile-crew-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.tile-crew-name {
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex: 1;
+}
+.tile-crew-lock {
+  font-size: 0.85rem;
+}
+.tile-crew-pilots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.tile-crew-pilot {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+.tile-crew-car {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}

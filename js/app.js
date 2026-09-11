@@ -471,6 +471,8 @@ function renderDepartureTile(dep, now) {
 
       ${availHtml}
 
+      ${renderTileCrews(dep)}
+
       ${renderTileSetups(dep)}
 
       <div class="countdown-section">
@@ -492,7 +494,58 @@ function renderDepartureTile(dep, now) {
 }
 
 // ============================================================
-// RENDER — BOUTONS SETUPS SUR LA TUILE
+// RENDER — ÉQUIPAGES SUR LA TUILE
+// ============================================================
+function renderTileCrews(dep) {
+  const crews = dep.crews || [];
+  if (crews.length === 0) return '';
+
+  const crewColors = [
+    'var(--accent-gold)', 'var(--accent-blue)', 'var(--accent-green)',
+    'var(--accent-red)', 'var(--accent-purple)', 'var(--accent-orange)'
+  ];
+
+  return `
+    <div class="tile-crews">
+      <div class="tile-crews-header">
+        <span>🏎 Équipages (${crews.length})</span>
+      </div>
+      <div class="tile-crews-list">
+        ${crews.map((crew, idx) => {
+          const color = crewColors[idx % crewColors.length];
+          const pilots = (crew.registrationIds || [])
+            .map(id => (dep.availability || []).find(r => r.id === id))
+            .filter(Boolean);
+
+          return `
+            <div class="tile-crew-item" style="border-left-color: ${color};">
+              <div class="tile-crew-header">
+                <span class="tile-crew-name">${escapeHtml(crew.name)}</span>
+                <span class="badge badge-${badgeClass(crew.category)}" style="font-size:0.6rem;">
+                  ${escapeHtml(crew.category)}
+                </span>
+                ${crew.locked ? '<span class="tile-crew-lock">🔒</span>' : ''}
+              </div>
+              <div class="tile-crew-pilots">
+                ${pilots.map(p => `
+                  <span class="tile-crew-pilot">
+                    ${escapeHtml(p.name)}
+                    ${p.userId === state.user?.id ? '⭐' : ''}
+                  </span>
+                `).join('')}
+                ${pilots.length === 0 ? '<span class="text-dim">Aucun pilote</span>' : ''}
+              </div>
+              ${crew.car ? `<div class="tile-crew-car">🚗 ${escapeHtml(crew.car)}</div>` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER — SETUPS SUR LA TUILE
 // ============================================================
 function renderTileSetups(dep) {
   const setups = dep.eventSetups || {};
@@ -562,7 +615,6 @@ async function init() {
     showLoader(false);
     renderHome();
 
-    // ✅ Auto-suppression des événements passés
     try {
       await actions.autoDeletePastEvents();
     } catch (err) {
@@ -580,6 +632,7 @@ async function init() {
         if (state.page === 'home') renderHome();
         else if (state.page === 'event') re.renderEventDetail();
         else if (state.page === 'admin') import('./render-admin.js').then(m => m.renderAdmin());
+        else if (state.page === 'users') import('./render-users.js').then(m => m.renderUsers());
         showToast('🔄 Données mises à jour', 'info');
       });
     });

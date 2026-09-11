@@ -447,13 +447,23 @@ export function addCrew(target) {
 
 export function editCrew(target) {
   if (!app.canManage()) return;
+
   const dep = getDep(target);
   if (!dep) return;
   const crew = (dep.crews || []).find(c => c.id === target.dataset.crew);
   if (!crew) return;
+
+  // ⚠️ Seuls les NON-ADMINS sont bloqués par le verrou
+  if (crew.locked && !app.isAdmin()) {
+    return showToast('🔒 Équipage verrouillé. Déverrouille-le d\'abord.', 'error');
+  }
+
   app.state.crewForm = {
-    departureId: dep.id, category: crew.category, name: crew.name,
-    car: crew.car || '', selectedPilots: [...(crew.registrationIds || [])],
+    departureId: dep.id,
+    category: crew.category,
+    name: crew.name,
+    car: crew.car || '',
+    selectedPilots: [...(crew.registrationIds || [])],
     crewId: crew.id
   };
   app.state.openDepartures[dep.id] = true;
@@ -462,14 +472,47 @@ export function editCrew(target) {
 
 export async function deleteCrew(target) {
   if (!app.canManage()) return;
-  if (!confirm('Supprimer cet équipage ?')) return;
+
   const dep = getDep(target);
   if (!dep) return;
-  dep.crews = (dep.crews || []).filter(c => c.id !== target.dataset.crew);
+  const crew = (dep.crews || []).find(c => c.id === target.dataset.crew);
+  if (!crew) return;
+
+  // ⚠️ Seuls les NON-ADMINS sont bloqués par le verrou
+  if (crew.locked && !app.isAdmin()) {
+    return showToast('🔒 Équipage verrouillé. Déverrouille-le d\'abord.', 'error');
+  }
+
+  if (!confirm(`Supprimer l'équipage "${crew.name}" ?`)) return;
+
+  dep.crews = (dep.crews || []).filter(c => c.id !== crew.id);
   app.state.openDepartures[dep.id] = true;
   await saveEventToStorage();
   re.renderEventDetail();
   showToast('Équipage supprimé', 'info');
+}
+
+export async function toggleCrewLock(target) {
+  if (!app.canManage()) return showToast('Réservé aux organisateurs', 'error');
+
+  const depId = target.dataset.dep;
+  const crewId = target.dataset.crew;
+  const dep = app.getDeparture(app.state.currentEventId, depId);
+  if (!dep) return;
+
+  const crew = (dep.crews || []).find(c => c.id === crewId);
+  if (!crew) return;
+
+  crew.locked = !crew.locked;
+
+  await saveEventToStorage();
+  re.renderEventDetail();
+  showToast(
+    crew.locked
+      ? `🔒 Équipage "${crew.name}" verrouillé`
+      : `🔓 Équipage "${crew.name}" déverrouillé`,
+    'success'
+  );
 }
 
 export async function autoAssign(target) {
@@ -484,13 +527,22 @@ export async function autoAssign(target) {
   showToast(`Équipages créés automatiquement`, 'success');
 }
 
-export function toggleCrewPilot(target) {
-  const pilotId = target.dataset.pilot;
+export function toggleCrewPilotClick(event, pilotId) {
+  if (event) event.stopPropagation();
+
   const cf = app.state.crewForm;
   if (!cf) return;
+
   const idx = cf.selectedPilots.indexOf(pilotId);
-  if (idx > -1) cf.selectedPilots.splice(idx, 1);
-  else cf.selectedPilots.push(pilotId);
+  if (idx > -1) {
+    cf.selectedPilots.splice(idx, 1);
+  } else {
+    cf.selectedPilots.push(pilotId);
+  }
+
+  console.log('[CREW] selectedPilots:', cf.selectedPilots);
+
+  // Re-render pour mettre à jour le visuel
   re.renderEventDetail();
 }
 
@@ -504,17 +556,35 @@ export async function saveCrew(target) {
   const category = document.getElementById('crewCategorySelect')?.value || cf.category;
   const car = document.getElementById('crewCarSelect')?.value || cf.car || '';
 
+  console.log('[CREW] Save:', {
+    name, category, car,
+    selectedPilots: cf.selectedPilots,
+    count: cf.selectedPilots.length
+  });
+
   if (!category) return showToast('Choisis une catégorie', 'error');
   if (!name) return showToast('Donne un nom', 'error');
-  if (cf.selectedPilots.length < 2) return showToast('Minimum 2 pilotes', 'error');
+  if (cf.selectedPilots.length < 2) {
+    return showToast(`Sélectionne au moins 2 pilotes (actuellement : ${cf.selectedPilots.length})`, 'error');
+  }
 
   if (cf.crewId) {
     const crew = dep.crews.find(c => c.id === cf.crewId);
-    if (crew) Object.assign(crew, { name, category, car, registrationIds: cf.selectedPilots });
+    if (crew) {
+      if (crew.locked && !app.isAdmin()) {
+        return showToast('🔒 Équipage verrouillé', 'error');
+      }
+      Object.assign(crew, {
+        name, category, car,
+        registrationIds: [...cf.selectedPilots]
+      });
+    }
   } else {
     dep.crews.push({
-      id: generateId(), name, category, car,
-      registrationIds: [...cf.selectedPilots]
+      id: generateId(),
+      name, category, car,
+      registrationIds: [...cf.selectedPilots],
+      locked: false
     });
   }
 
@@ -661,6 +731,7 @@ export function downloadSetupFromTile(target) {
 
   showToast(`📥 Téléchargement de "${setup.name}"`, 'info');
 }
+
 // ============================================================
 // ADMIN — Configuration des jeux
 // ============================================================
@@ -693,15 +764,11 @@ export async function adminSaveGame(gameId, data) {
     return false;
   }
 
-  // Mettre à jour le state local
   app.state.gameConfigs[gameId] = data;
-
-  // Et le localStorage (backup)
   localStorage.setItem('endurance_game_configs', JSON.stringify({
     configs: app.state.gameConfigs,
     ids: app.state.gameIds
   }));
-
   return true;
 }
 
@@ -717,13 +784,7 @@ export async function adminAddGame() {
 
   const icon = prompt('Icône (emoji, ex: 🏎️):', '🎮') || '🎮';
 
-  const newConfig = {
-    name: name.trim(),
-    icon: icon.trim(),
-    circuits: [],
-    categories: [],
-    cars: {}
-  };
+  const newConfig = { name: name.trim(), icon: icon.trim(), circuits: [], categories: [], cars: {} };
 
   const ok = await adminSaveGame(id, newConfig);
   if (!ok) return;
@@ -743,9 +804,7 @@ export async function adminDeleteGame(target) {
   if (!config) return;
 
   const used = app.state.events.some(e => e.gameId === gameId);
-  if (used) {
-    return showToast('Impossible : ce jeu est utilisé dans des courses', 'error');
-  }
+  if (used) return showToast('Impossible : ce jeu est utilisé dans des courses', 'error');
 
   if (!confirm(`⚠️ Supprimer le jeu "${config.name}" et toute sa configuration ?`)) return;
 
@@ -838,7 +897,7 @@ export async function adminDeleteCategory(target) {
 
   const used = app.state.events.some(e => e.gameId === gameId && (e.categories || []).includes(category));
   const msg = used
-    ? `⚠️ La catégorie "${category}" est utilisée dans des courses.\n\nSi tu la supprimes, elle disparaîtra des courses. Continuer ?`
+    ? `⚠️ La catégorie "${category}" est utilisée dans des courses.\n\nContinuer ?`
     : `Supprimer la catégorie "${category}" et ses voitures ?`;
   if (!confirm(msg)) return;
 
@@ -894,6 +953,7 @@ export async function adminDeleteCar(target) {
     radmin.renderAdmin();
   }
 }
+
 // ============================================================
 // ADMIN — Gestion des utilisateurs
 // ============================================================
@@ -910,7 +970,6 @@ export async function adminChangeRole(userId, newRole) {
     return showToast('Rôle invalide', 'error');
   }
 
-  // Sécurité : ne pas se rétrograder soi-même
   if (userId === app.state.user.id && newRole !== 'admin') {
     if (!confirm('⚠️ Tu vas perdre tes droits admin. Continuer ?')) {
       rusers.renderUsers();
@@ -939,13 +998,8 @@ export async function adminChangeRole(userId, newRole) {
     return showToast('Erreur : ' + error.message, 'error');
   }
 
-  // Mise à jour locale
   user.role = newRole;
-
-  // Si c'est nous-même, mettre à jour state.user
-  if (userId === app.state.user.id) {
-    app.state.user.role = newRole;
-  }
+  if (userId === app.state.user.id) app.state.user.role = newRole;
 
   showToast(`✅ ${user.name} → ${newRole}`, 'success');
   rusers.renderUsers();
@@ -971,8 +1025,6 @@ export async function adminDeleteUser(target) {
 
   const { supabase } = await import('./storage-supabase.js');
 
-  // 1. Supprimer le profil (les inscriptions dans les events sont dans du JSON,
-  //    donc on doit les nettoyer manuellement dans chaque course)
   const { error: profileErr } = await supabase
     .from('profiles')
     .delete()
@@ -984,7 +1036,6 @@ export async function adminDeleteUser(target) {
     return showToast('Erreur : ' + profileErr.message, 'error');
   }
 
-  // 2. Retirer ses inscriptions de toutes les courses
   for (const ev of app.state.events) {
     let changed = false;
     (ev.departures || []).forEach(dep => {
@@ -993,15 +1044,10 @@ export async function adminDeleteUser(target) {
       if (dep.availability.length !== before) changed = true;
     });
     if (changed) {
-      try {
-        await storage.saveEvent(ev);
-      } catch (err) {
-        console.error('Erreur nettoyage event:', err);
-      }
+      try { await storage.saveEvent(ev); } catch (err) { console.error(err); }
     }
   }
 
-  // 3. Retirer du state
   app.state.users = app.state.users.filter(u => u.id !== userId);
 
   showLoader(false);
@@ -1009,25 +1055,13 @@ export async function adminDeleteUser(target) {
   rusers.renderUsers();
 }
 
-export function adminUsersSearch() {
-  // Utilisé pour re-render la page users
-  rusers.renderUsers();
-}
 // ============================================================
 // AUTO-SUPPRESSION DES ÉVÉNEMENTS PASSÉS
 // ============================================================
-// Supprime automatiquement les événements dont le dernier départ
-// + durée + délai de grâce est passé.
+const AUTO_DELETE_GRACE_HOURS = 24;
+const AUTO_DELETE_SAFETY_HOURS = 48;
+const AUTO_DELETE_ENABLED = true;
 
-const AUTO_DELETE_GRACE_HOURS = 24;      // Délai avant suppression (heures)
-const AUTO_DELETE_SAFETY_HOURS = 48;     // Délai minimum après un upload de setup
-const AUTO_DELETE_ENABLED = true;         // Passez à false pour désactiver
-
-/**
- * Vérifie si un événement doit être supprimé.
- * @param {Object} event
- * @returns {boolean}
- */
 function shouldAutoDelete(event) {
   if (!event.departures || event.departures.length === 0) return false;
 
@@ -1036,40 +1070,30 @@ function shouldAutoDelete(event) {
   const grace = AUTO_DELETE_GRACE_HOURS * 3600000;
   const safety = AUTO_DELETE_SAFETY_HOURS * 3600000;
 
-  // Trouver le dernier départ
   const lastDepartureTs = Math.max(...event.departures.map(d => d.startsAt || 0));
   const endTs = lastDepartureTs + duration;
   const deleteAfterTs = endTs + grace;
 
-  // Si pas encore passé le délai de suppression → on garde
   if (now < deleteAfterTs) return false;
 
-  // Sécurité supplémentaire : si un setup a été uploadé récemment → on attend
   if (event.setups) {
     const allSetups = Object.values(event.setups).flat();
     const lastUpload = Math.max(0, ...allSetups.map(s => s.uploadedAt || 0));
-    if (lastUpload > 0 && (now - lastUpload) < safety) {
-      return false;
-    }
+    if (lastUpload > 0 && (now - lastUpload) < safety) return false;
   }
 
   return true;
 }
 
-/**
- * Supprime automatiquement les événements passés.
- * Retourne la liste des IDs supprimés.
- */
 export async function autoDeletePastEvents() {
   if (!AUTO_DELETE_ENABLED) return [];
-  if (!app.isAdmin()) return []; // Seuls les admins déclenchent la suppression
+  if (!app.isAdmin()) return [];
   if (!app.state.events.length) return [];
 
   const toDelete = app.state.events.filter(shouldAutoDelete);
   if (toDelete.length === 0) return [];
 
-  console.log(`[AUTO-DELETE] ${toDelete.length} événement(s) à supprimer :`,
-    toDelete.map(e => e.name));
+  console.log(`[AUTO-DELETE] ${toDelete.length} événement(s) à supprimer :`, toDelete.map(e => e.name));
 
   const deletedIds = [];
   for (const ev of toDelete) {
@@ -1093,13 +1117,10 @@ export async function autoDeletePastEvents() {
 
   return deletedIds;
 }
-// ============================================================
-// ADMIN — Nettoyage manuel
-// ============================================================
+
 export async function adminCleanup() {
   if (!app.isAdmin()) return showToast('Réservé aux admins', 'error');
 
-  // Compter les événements éligibles
   const eligible = app.state.events.filter(shouldAutoDelete);
 
   if (eligible.length === 0) {
