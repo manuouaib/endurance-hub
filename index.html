@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Endurance Hub · Gestion de courses</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="header">
+      <div class="brand">
+        <span class="brand-icon">🏁</span>
+        <div>
+          <span class="brand-text">ENDURANCE</span>
+          <span class="brand-sub">Hub · Gestion de courses</span>
+        </div>
+      </div>
+      <div class="header-actions" id="navActions">
+        <!-- Rempli par JS -->
+      </div>
+    </header>
+
+    <!-- ==================== MAIN ==================== -->
+    <main id="mainContent">
+      <div class="empty">
+        <span class="big-icon">⏳</span>
+        <h3>Chargement…</h3>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ==================== TOASTS ==================== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ==================== LOADER ==================== -->
+  <div class="loader-overlay" id="loaderOverlay">
+    <div class="loader-spinner"></div>
+    <p class="loader-text" id="loaderText">Chargement…</p>
+  </div>
+
+  <!-- ==================== MODAL LOGIN ==================== -->
+  <div class="modal-overlay" id="loginModal">
+    <div class="modal">
+      <h2>🔑 Connexion</h2>
+      <p class="subtitle">Connecte-toi avec Discord pour gérer tes courses.</p>
+
+      <button class="btn btn-discord btn-lg" data-action="discordLogin" style="width:100%;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20.317 4.492a19.837 19.837 0 0 0-4.885-1.515.069.069 0 0 0-.074.034c-.237.428-.48.879-.701 1.344a18.425 18.425 0 0 0-5.314 0 13.269 13.269 0 0 0-.71-1.344.067.067 0 0 0-.073-.034 19.805 19.805 0 0 0-4.885 1.515.067.067 0 0 0-.025.023C1.494 7.058.446 9.554.141 12.016a.065.065 0 0 0 .024.058 19.933 19.933 0 0 0 4.86 2.45.067.067 0 0 0 .074-.026 13.854 13.854 0 0 0 1.006-1.625.068.068 0 0 0-.037-.094 13.28 13.28 0 0 1-1.538-.733.068.068 0 0 1-.02-.112c.103-.076.207-.156.308-.238a.067.067 0 0 1 .07-.01 13.87 13.87 0 0 0 6.196 0 .067.067 0 0 1 .07.01c.1.082.205.162.308.238a.068.068 0 0 1-.02.112 13.28 13.28 0 0 1-1.538.733.068.068 0 0 0-.037.095c.29.58.623 1.129 1.006 1.625a.067.067 0 0 0 .074.026 19.933 19.933 0 0 0 4.86-2.45.066.066 0 0 0 .024-.058c-.305-2.466-1.353-4.947-2.815-7.5a.066.066 0 0 0-.025-.023zM8.147 13.263c-1.226 0-2.235-1.126-2.235-2.511s.99-2.512 2.235-2.512c1.255 0 2.256 1.135 2.235 2.512-.02 1.385-.98 2.511-2.235 2.511zm7.706 0c-1.226 0-2.235-1.126-2.235-2.511s.99-2.512 2.235-2.512c1.255 0 2.256 1.135 2.235 2.512-.02 1.385-.98 2.511-2.235 2.511z"/>
+        </svg>
+        Continuer avec Discord
+      </button>
+
+      <button class="btn btn-outline" data-action="closeLogin" style="width:100%;margin-top:12px;">
+        Annuler
+      </button>
+
+      <p class="modal-footer">
+        En te connectant, tu acceptes de partager ton pseudo et avatar Discord avec l'application.
+      </p>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL COURSE ==================== -->
+  <div class="modal-overlay" id="courseModal">
+    <div class="modal modal-lg">
+      <h2 id="courseModalTitle">➕ Nouvelle course</h2>
+      <p class="subtitle">Configure ta course d'endurance.</p>
+
+      <form id="courseForm">
+        <div class="form-group">
+          <label>🎮 Jeu</label>
+          <select id="fGame" required></select>
+        </div>
+
+        <div class="form-group">
+          <label>🏁 Nom de la course</label>
+          <input id="fName" placeholder="Ex: 24 Heures du Mans 2027" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>⏱ Durée (heures)</label>
+            <input id="fDuration" type="number" min="1" max="24" value="6" required>
+          </div>
+          <div class="form-group">
+            <label>📍 Circuit</label>
+            <select id="fCircuit" required></select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>🏷 Type d'événement</label>
+          <select id="fType">
+            <option value="private">Privé</option>
+            <option value="special">⭐ Special Event</option>
+            <option value="lmu">🏆 Championnat</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>🏎 Catégories</label>
+          <div class="category-picker" id="categoryPicker"></div>
+          <input type="hidden" id="fCats">
+        </div>
+
+        <div class="form-group">
+          <label>📅 Départs</label>
+          <div id="departureList"></div>
+          <button type="button" class="btn btn-outline btn-sm mt-8" data-action="addDep">+ Ajouter un départ</button>
+          <p class="text-dim" style="font-size:0.8rem;margin-top:6px;">Horaires en heure de Paris.</p>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-action="closeCourse">Annuler</button>
+          <button type="submit" class="btn btn-primary" id="courseSubmitBtn">🚀 Créer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
